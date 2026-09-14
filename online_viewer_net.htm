@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro RCD Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Landscape Warning */
+        @media (orientation: landscape) {
+            .portrait-app { display: none !important; }
+            .landscape-warning { display: flex !important; }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up { animation: fadeInUp 0.3s ease-out forwards; }
+        .hidden-el { display: none !important; }
+        
+        /* Toast Notification */
+        .toast-notification {
+            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+            background: #333; color: #fff; padding: 12px 24px; border-radius: 8px;
+            font-size: 14px; font-weight: 600; z-index: 999999; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); text-align: center; width: max-content; max-width: 90%;
+        }
+        .toast-notification.show { top: 20px; }
+        .toast-notification.success { background-color: #10b981; }
+        .toast-notification.error { background-color: #ef4444; }
+        .toast-notification.warning { background-color: #f59e0b; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans overflow-hidden selection:bg-blue-200 h-screen w-screen m-0 p-0">
+
+    <!-- LANDSCAPE WARNING -->
+    <div class="hidden landscape-warning fixed inset-0 bg-slate-900 z-[99999] flex-col items-center justify-center text-white">
+        <i class="fa-solid fa-mobile-screen fa-rotate-90 text-6xl mb-4 animate-pulse"></i>
+        <h2 class="text-2xl font-bold mb-2">Please Rotate Device</h2>
+        <p class="text-sm text-slate-300 text-center px-6">This app is designed for portrait mode only.</p>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div class="portrait-app flex flex-col h-full w-full max-w-md mx-auto bg-slate-50 relative shadow-xl">
+        
+        <!-- Header -->
+        <header class="bg-blue-600 text-white py-4 px-5 shrink-0 shadow-sm flex justify-center items-center z-10">
+            <h1 class="font-bold text-lg tracking-wide uppercase">Pro RCD Calculator</h1>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4 flex flex-col gap-4 justify-center relative overflow-y-auto hide-scrollbar">
+            
+            <!-- Form Card (Compact & Simple) -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-1 z-10">
+                
+                <!-- Customer Type (Chips Inline) -->
+                <div class="flex justify-between items-center py-2.5 border-b border-slate-100">
+                    <label class="text-sm font-semibold text-slate-700 mr-2">Customer</label>
+                    <div class="flex gap-1.5 overflow-x-auto hide-scrollbar">
+                        <button onclick="setCust('NEW', this)" class="cust-btn bg-blue-600 text-white px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors whitespace-nowrap">NEW</button>
+                        <button onclick="setCust('EMI CARD', this)" class="cust-btn bg-slate-100 text-slate-600 px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors whitespace-nowrap">EMI CARD</button>
+                        <button onclick="setCust('VIRTUAL', this)" class="cust-btn bg-slate-100 text-slate-600 px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors whitespace-nowrap">VIRTUAL</button>
+                        <button onclick="setCust('W/O CARD', this)" class="cust-btn bg-slate-100 text-slate-600 px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors whitespace-nowrap">W/O CARD</button>
+                    </div>
+                    <input type="hidden" id="custType" value="NEW">
+                </div>
+
+                <!-- Approved Limit -->
+                <div class="flex items-center justify-between py-2.5 border-b border-slate-100">
+                    <label class="text-sm font-semibold text-slate-700">Appr. Limit (₹)</label>
+                    <input type="number" inputmode="numeric" id="apprLimit" placeholder="0" class="w-28 bg-slate-50 border border-slate-300 text-slate-800 text-base rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-500 px-2 py-1 text-right font-bold outline-none transition-all shadow-inner">
+                </div>
+
+                <!-- LTV -->
+                <div class="flex items-center justify-between py-2.5 border-b border-slate-100">
+                    <label class="text-sm font-semibold text-slate-700">LTV (%)</label>
+                    <div class="relative w-28">
+                        <input type="number" inputmode="numeric" id="ltvPer" value="100" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-base rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-500 px-2 pr-6 py-1 text-right font-bold outline-none transition-all shadow-inner">
+                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">%</span>
+                    </div>
+                </div>
+
+                <!-- EMI Cap -->
+                <div class="flex items-center justify-between py-2.5">
+                    <label class="text-sm font-semibold text-slate-700">EMI Cap (Max ₹)</label>
+                    <input type="number" inputmode="numeric" id="emiCapping" placeholder="0" class="w-28 bg-slate-50 border border-slate-300 text-slate-800 text-base rounded-md focus:ring-2 focus:ring-blue-100 focus:border-blue-500 px-2 py-1 text-right font-bold outline-none transition-all shadow-inner">
+                </div>
+            </div>
+
+            <!-- Import & View Actions -->
+            <div class="flex gap-3 shrink-0">
+                <input type="file" id="importExcelFile" accept=".xlsx, .xls, .csv" class="hidden">
+                <button onclick="document.getElementById('importExcelFile').click()" class="flex-1 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 font-bold py-2.5 rounded-lg transition-colors text-[13px] flex justify-center items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-file-excel text-emerald-600 text-lg"></i> Import Sheet
+                </button>
+                <button onclick="openDictionaryModal()" class="flex-1 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 font-bold py-2.5 rounded-lg transition-colors text-[13px] flex justify-center items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-book-open text-blue-600 text-lg"></i> View Schemes
+                </button>
+            </div>
+
+            <!-- Calculate Button -->
+            <button id="calculateBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl shadow-md transition-all active:scale-[0.98] flex justify-center items-center gap-2 text-lg shrink-0 tracking-wide uppercase">
+                Calculate
+            </button>
+
+            <!-- Result Box -->
+            <div id="resultBox" class="bg-blue-50 p-4 rounded-xl border border-blue-200 hidden flex-col gap-2.5 relative shrink-0 transition-all duration-300 transform shadow-sm">
+                <div class="flex justify-between items-center border-b border-blue-100 pb-2">
+                     <span class="text-sm font-bold text-slate-600">Customer</span>
+                     <span id="resCustomerType" class="text-xs font-black text-blue-800 bg-blue-200 px-2 py-1 rounded">NEW</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-blue-100 pb-2">
+                     <span class="text-sm font-bold text-slate-600">Approved Limit</span>
+                     <span id="resMaxLoan" class="text-xl font-black text-slate-900">₹0</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-blue-100 pb-2">
+                     <span class="text-sm font-bold text-slate-600">LTV Allowed</span>
+                     <span id="resLtv" class="text-lg font-black text-slate-900">100%</span>
+                </div>
+                <div class="flex justify-between items-center pb-1">
+                     <span class="text-sm font-bold text-slate-600">EMI Cap</span>
+                     <span id="resEmiCap" class="text-lg font-black text-slate-900">Not Set</span>
+                </div>
+                
+                <button id="shareBtn" class="w-full bg-[#25D366] hover:bg-[#20b858] text-white font-bold py-3 rounded-lg text-sm flex justify-center items-center gap-2 shadow-sm transition-colors active:scale-95 mt-2 uppercase">
+                    <i class="fa-brands fa-whatsapp text-xl"></i> Share Result
+                </button>
+            </div>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="bg-white border-t border-slate-200 py-3 flex justify-between items-center px-5 z-10 shrink-0">
+            <div class="text-[11px] font-bold text-slate-400 uppercase">Crafted by <span class="text-slate-700">the_lakshya</span></div>
+            <a href="tel:8087313624" class="text-[13px] font-black text-slate-700 flex items-center gap-1.5 bg-slate-100 px-3 py-1 rounded-full">
+                <i class="fa-solid fa-headset text-blue-600"></i> 8087313624
+            </a>
+        </footer>
+    </div>
+
+    <!-- UI Essentials -->
+    <div id="toastNotification" class="toast-notification"></div>
+
+    <!-- Hidden inputs strictly required by global JS for Dictionary calculation -->
+    <div class="hidden-el">
+        <select id="calcCustType">
+            <option value="NEW">NEW</option>
+            <option value="EMI CARD">EMI CARD</option>
+            <option value="VIRTUAL CARD">VIRTUAL</option>
+            <option value="W/O CARD">W/O CARD</option>
+        </select>
+        <input id="calcLimit"><input id="calcLtv"><input id="calcCap"><input id="calcMargin"><input id="calcTarget">
+        <input id="calcInvoice">
+    </div>
+
+    <!-- Real Dictionary Modal -->
+    <div id="dictionarySearchModal" class="hidden-el fixed inset-0 bg-slate-50 z-[9999] flex-col overflow-hidden max-w-md mx-auto">
+        <div class="bg-blue-600 text-white p-4 flex justify-between items-center shrink-0 shadow-md">
+            <h2 class="font-black text-base uppercase tracking-wide"><i class="fa-solid fa-book-open mr-2"></i>Scheme Dictionary</h2>
+            <button onclick="closeDictionaryModal()" class="bg-white/20 hover:bg-white/30 rounded-full w-8 h-8 flex items-center justify-center transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-4 shrink-0 bg-white border-b border-slate-200 shadow-sm relative z-20">
+            <div class="relative">
+                <i class="fa-solid fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+                <input type="text" id="globalModelSearch" placeholder="Search Brand or Model Name..." class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500 pl-10 p-3 font-bold outline-none shadow-inner" oninput="doGlobalSearch()" onfocus="doGlobalSearch()">
+            </div>
+            <div id="globalModelDropdown" class="absolute left-4 right-4 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto hidden-el z-50"></div>
+        </div>
+
+        <div id="schemeResultArea" class="flex-1 overflow-y-auto p-4 bg-slate-100 hidden-el">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+                <div class="p-3 border-b border-slate-200 bg-slate-50 shrink-0">
+                    <h3 id="globalViewerTitle" class="font-black text-blue-800 text-center text-sm mb-3 uppercase"></h3>
+                    <div class="flex items-center justify-between gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                        <label class="text-xs font-bold text-slate-600 whitespace-nowrap">Invoice Amount (₹)</label>
+                        <input type="number" inputmode="numeric" id="dictInvoiceInput" placeholder="0" class="w-28 bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded focus:ring-2 focus:ring-blue-100 focus:border-blue-500 p-1.5 text-right font-bold outline-none" oninput="recalcDictionaryModel(this.value)">
+                    </div>
+                </div>
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left border-collapse">
+                        <thead id="tableHead" class="bg-slate-100 border-b border-slate-200 text-slate-700 text-xs"></thead>
+                        <tbody id="globalViewerBody" class="divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for Dictionary
+        let db_records = [];
+        let currentViewedModel = "";
+        const SPECIAL_MODEL = "NON TIEUP";
+
+        // Toast functionality
+        let toastTimeout;
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById("toastNotification");
+            if (!toast) return;
+            toast.className = "toast-notification show " + type;
+            toast.innerText = message;
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(function(){ toast.className = "toast-notification"; }, 3000);
+        }
+
+        // Format Currency Helper
+        function formatCurrency(val) {
+            return '₹' + parseInt(val).toLocaleString('en-IN');
+        }
+
+        // Customer Type Chip Selector
+        function setCust(type, btn) {
+            document.getElementById('custType').value = type;
+            document.querySelectorAll('.cust-btn').forEach(b => {
+                b.classList.remove('bg-blue-600', 'text-white');
+                b.classList.add('bg-slate-100', 'text-slate-600');
+            });
+            btn.classList.remove('bg-slate-100', 'text-slate-600');
+            btn.classList.add('bg-blue-600', 'text-white');
+            
+            // Adjust LTV based on customer type (Optional logic, can be customized)
+            let ltvInput = document.getElementById('ltvPer');
+            if(type === 'NEW') ltvInput.value = 100;
+            if(type === 'EMI CARD') ltvInput.value = 100;
+            if(type === 'VIRTUAL') ltvInput.value = 100;
+            if(type === 'W/O CARD') ltvInput.value = 100;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const calculateBtn = document.getElementById('calculateBtn');
+            const resultBox = document.getElementById('resultBox');
+            const shareBtn = document.getElementById('shareBtn');
+            
+            if(calculateBtn) {
+                calculateBtn.addEventListener('click', () => {
+                    const limitInput = document.getElementById('apprLimit');
+                    const limit = parseFloat(limitInput.value) || 0;
+                    const type = document.getElementById('custType').value;
+                    const ltv = parseFloat(document.getElementById('ltvPer').value) || 100;
+                    const emiCap = parseFloat(document.getElementById('emiCapping').value) || 0;
+
+                    // Error Validation (Shake effect)
+                    if (limit <= 0) {
+                        limitInput.classList.add('border-red-500', 'bg-red-50', 'animate-pulse');
+                        setTimeout(() => limitInput.classList.remove('border-red-500', 'bg-red-50', 'animate-pulse'), 1000);
+                        showToast("⚠️ Please enter Approved Limit", "error");
+                        return;
+                    }
+
+                    // Populate Result Box safely
+                    document.getElementById('resCustomerType').textContent = type;
+                    document.getElementById('resMaxLoan').textContent = formatCurrency(limit);
+                    document.getElementById('resLtv').textContent = ltv + '%';
+                    document.getElementById('resEmiCap').textContent = emiCap > 0 ? formatCurrency(emiCap) : 'Not Set';
+                    
+                    // Sync variables with the Global UI components for the Dictionary
+                    let dictType = document.getElementById('calcCustType');
+                    if(dictType) {
+                        if(type === 'EMI CARD') dictType.value = 'EMI CARD';
+                        else if(type === 'VIRTUAL') dictType.value = 'VIRTUAL CARD';
+                        else if(type === 'W/O CARD') dictType.value = 'W/O CARD';
+                        else dictType.value = 'NEW';
+                    }
+                    if(document.getElementById('calcLimit')) document.getElementById('calcLimit').value = limit;
+                    if(document.getElementById('calcLtv')) document.getElementById('calcLtv').value = ltv;
+                    if(document.getElementById('calcCap')) document.getElementById('calcCap').value = emiCap;
+
+                    // Show Results safely
+                    resultBox.classList.remove('hidden');
+                    resultBox.style.display = 'flex';
+                    resultBox.classList.add('animate-fade-in-up');
+                    
+                    showToast("✅ Calculated Successfully!", "success");
+                });
+            }
+
+            if(shareBtn) {
+                shareBtn.addEventListener('click', () => {
+                    const type = document.getElementById('resCustomerType').textContent;
+                    const limit = document.getElementById('resMaxLoan').textContent;
+                    const ltv = document.getElementById('resLtv').textContent;
+                    const cap = document.getElementById('resEmiCap').textContent;
+                    
+                    const text = `*PRO RCD Calculator*\n\n` +
+                                 `👤 Customer: *${type}*\n` +
+                                 `💳 Appr. Limit: *${limit}*\n` +
+                                 `📊 LTV Allowed: *${ltv}*\n` +
+                                 `🔒 EMI Cap: *${cap}*`;
+                                 
+                    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+                    window.open(whatsappUrl, '_blank');
+                });
+            }
+
+            // Handle Excel Import Logic securely without breaking HTML
+            const importExcelFile = document.getElementById('importExcelFile');
+            if (importExcelFile) {
+                importExcelFile.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    showToast("⏳ Reading Excel Sheet...", "warning");
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(evt) {
+                        try {
+                            const data = new Uint8Array(evt.target.result);
+                            const wb = XLSX.read(data, { type: 'array' });
+                            
+                            let tempSheet1Data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { raw: false, defval: "" });
+                            let parsedSheet2Data = wb.SheetNames.length > 1 ? XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]], { raw: false, defval: "" }).map(r => mapData(r, SPECIAL_MODEL)).filter(x => x && x.model && x.model.trim() !== "") : [];
+                            
+                            let filteredSheet1 = tempSheet1Data.map(r => mapData(r, "REG")).filter(m => m && m.model && m.model.trim() !== "");
+                            let rawCombined = [...filteredSheet1, ...parsedSheet2Data];
+                            
+                            let uniqueDB = []; 
+                            let seenDB = new Set();
+                            
+                            rawCombined.forEach(r => { 
+                                let key = `${r.model}_${r.category}_${r.tenure}_${r.advEmi}_${r.fixedEmi}_${r.minLoan}_${r.maxLoan}`; 
+                                if (!seenDB.has(key)) { seenDB.add(key); uniqueDB.push(r); } 
+                            });
+                            
+                            let today = new Date(); today.setHours(0,0,0,0);
+                            db_records = uniqueDB.filter(r => {
+                                if(!r.expiryDateStr) return true;
+                                let p = r.expiryDateStr.split('/');
+                                if(p.length !== 3) return true;
+                                let expD = new Date(p[2], p[1]-1, p[0]);
+                                return expD >= today;
+                            });
+                            
+                            showToast(`✅ Successfully Imported ${db_records.length} Schemes!`, "success");
+                            e.target.value = ''; // Reset input
+                        } catch (err) {
+                            console.error("Excel Parse Error:", err);
+                            showToast("⚠️ Error reading Excel file! Please check format.", "error");
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+        });
+
+        // Dictionary Helper Functions
+        function openDictionaryModal() { 
+            if(!db_records || db_records.length === 0) { 
+                showToast("⚠️ Please Import Excel Sheet first!", "error"); 
+                return; 
+            } 
+            document.getElementById('globalModelSearch').value = ''; 
+            document.getElementById('globalModelDropdown').style.display = 'none'; 
+            document.getElementById('schemeResultArea').style.display = 'none';
+            document.getElementById('dictionarySearchModal').style.display = 'flex'; 
+            document.getElementById('dictionarySearchModal').classList.remove('hidden-el');
+        }
+
+        function closeDictionaryModal() { 
+            document.getElementById('dictionarySearchModal').style.display = 'none'; 
+            document.getElementById('dictionarySearchModal').classList.add('hidden-el');
+        }
+
+        function doGlobalSearch() { 
+            let q = document.getElementById('globalModelSearch').value.toUpperCase().trim(); 
+            let dd = document.getElementById('globalModelDropdown'); 
+            if(!q) { dd.style.display='none'; return; } 
+            
+            let validRecords = db_records.filter(r => r.model !== SPECIAL_MODEL); 
+            let matches = validRecords.filter(r => { 
+                let m = r.model || ""; let b = r.brand || ""; let c = r.category || ""; 
+                return m.includes(q) || b.includes(q) || c.includes(q); 
+            }).map(r => r.model); 
+            
+            matches = [...new Set(matches)].slice(0, 20); 
+            
+            if (matches.length === 0) { 
+                dd.innerHTML = `<div class="p-3 text-red-500 font-bold text-center text-sm">No matching models found.</div>`; 
+                dd.style.display = 'block'; 
+                return; 
+            } 
+            
+            dd.innerHTML = matches.map(m => { 
+                let rec = validRecords.find(x => x.model === m); 
+                let brandTag = rec && rec.brand ? `<span class="text-[10px] text-blue-600 font-black mr-1">[${rec.brand}]</span>` : ''; 
+                return `<div class="p-3 border-b border-slate-100 cursor-pointer font-bold text-slate-800 text-sm hover:bg-blue-50 flex items-center" onclick="viewGlobalModel('${m.replace(/'/g, "\\'")}')">${brandTag}📱 ${m}</div>`; 
+            }).join(''); 
+            dd.style.display = 'block'; 
+        }
+
+        function viewGlobalModel(name) {
+            document.getElementById('globalModelSearch').value = name;
+            document.getElementById('globalModelDropdown').style.display = 'none';
+            currentViewedModel = name;
+
+            let rec = db_records.find(r => r.model === name);
+            if(rec && rec.mrp > 0) {
+                document.getElementById('dictInvoiceInput').value = rec.mrp;
+                document.getElementById('calcInvoice').value = rec.mrp;
+            } else {
+                document.getElementById('dictInvoiceInput').value = "";
+                document.getElementById('calcInvoice').value = "";
+            }
+
+            recalcDictionaryModel(document.getElementById('dictInvoiceInput').value);
+        }
+
+        function recalcDictionaryModel(invVal) {
+            document.getElementById('calcInvoice').value = invVal;
+            if(currentViewedModel !== "") {
+                renderTableModel();
+            }
+        }
+
+        function renderTableModel() {
+            let schemes = db_records.filter(r => r.model === currentViewedModel);
+            if(schemes.length === 0) return;
+            
+            document.getElementById('globalViewerTitle').innerText = '📱 ' + currentViewedModel;
+            
+            let custType = document.getElementById('calcCustType').value;
+            let ltvLimit = parseFloat(document.getElementById('calcLtv').value) || 100;
+            let limit = parseFloat(document.getElementById('calcLimit').value) || 0;
+            let invoice = parseFloat(document.getElementById('calcInvoice').value) || 0;
+            
+            let isCalculatedMode = (limit > 0 && invoice > 0);
+            
+            let thead = document.getElementById('tableHead');
+            if (isCalculatedMode) {
+                thead.innerHTML = `<tr>
+                    <th class="bg-blue-100 p-2 text-center">T/A</th>
+                    <th class="bg-emerald-100 text-emerald-700 p-2 text-center">LOAN</th>
+                    <th class="bg-orange-100 text-orange-700 p-2 text-center">DP</th>
+                    <th class="bg-blue-100 text-blue-700 p-2 text-center">EMI</th>
+                </tr>`;
+            } else {
+                thead.innerHTML = `<tr>
+                    <th class="bg-slate-200 p-2 text-center">T/A</th>
+                    <th class="bg-slate-200 p-2 text-center">FIXED EMI</th>
+                    <th class="bg-slate-200 p-2 text-center">DBD%</th>
+                    <th class="bg-slate-200 p-2 text-center">PF</th>
+                </tr>`;
+            }
+
+            let tbody = document.getElementById('globalViewerBody');
+            
+            // Basic filtering logic
+            let validSchemes = schemes.filter(s => s.tenure > 0 || s.fixedEmi > 0);
+            
+            tbody.innerHTML = validSchemes.map(s => {
+                let displayTenure = s.tenure;
+                
+                if (isCalculatedMode) {
+                    // Very basic mock calculation for demo
+                    let maxLoan = Math.min(invoice, limit);
+                    let emi = s.tenure > 0 ? (maxLoan / s.tenure) : 0;
+                    let dp = invoice - maxLoan + s.pf;
+                    
+                    return `<tr>
+                        <td class="font-black text-slate-700 p-2 text-center text-xs">${displayTenure}/${s.advEmi}</td>
+                        <td class="bg-emerald-50 text-emerald-700 font-bold p-2 text-center text-xs">₹${formatCurrency(maxLoan).replace('₹','')}</td>
+                        <td class="bg-orange-50 text-orange-700 font-bold p-2 text-center text-xs">₹${formatCurrency(dp).replace('₹','')}</td>
+                        <td class="bg-blue-50 text-blue-700 font-bold p-2 text-center text-xs">₹${formatCurrency(emi).replace('₹','')}</td>
+                    </tr>`;
+                } else {
+                    return `<tr>
+                        <td class="font-black text-slate-700 p-2 text-center text-xs">${displayTenure}/${s.advEmi}</td>
+                        <td class="font-bold text-blue-700 p-2 text-center text-xs">${s.fixedEmi > 0 ? '₹'+s.fixedEmi : 'N/A'}</td>
+                        <td class="p-2 text-center text-xs">${+parseFloat(s.dbd).toFixed(2)}%</td>
+                        <td class="font-bold p-2 text-center text-xs">₹${s.pf}</td>
+                    </tr>`;
+                }
+            }).join('');
+            
+            document.getElementById('schemeResultArea').style.display = 'block';
+        }
+
+        function standardizeCategoryName(cat) { 
+            if (!cat) return "OTHER"; 
+            let c = String(cat).toUpperCase().trim(); 
+            let cNoSpace = c.replace(/\s+/g, ''); 
+            if (cNoSpace.includes('PHONE') || cNoSpace.includes('MOBILE')) return "PHONE(WEB-MOBILE)"; 
+            return c; 
+        }
+
+        function findValLocal(row, targets) { 
+            let key = Object.keys(row).find(k => targets.includes(k.toUpperCase().replace(/\s/g, ''))); 
+            return key ? row[key] : null; 
+        }
+
+        function parseExcelDate(val) { 
+            if (!val) return null; 
+            if (typeof val === 'number') return new Date(Math.round((val - 25569) * 86400 * 1000)); 
+            if (typeof val === 'string') { let d = new Date(val); if (!isNaN(d.getTime())) return d; } 
+            return null; 
+        }
+
+        function mapData(row, type) { 
+            if(!row) return null; 
+            let expVal = findValLocal(row, ['EXPIRY', 'VALIDTILL']); 
+            let expDate = parseExcelDate(expVal); 
+            let isExp = false; let expiryDateStr = ""; 
+            if(expDate) { 
+                let today = new Date(); today.setHours(0,0,0,0); 
+                if(expDate < today) isExp = true; 
+                let dd = String(expDate.getDate()).padStart(2, '0'); 
+                let mm = String(expDate.getMonth() + 1).padStart(2, '0'); 
+                let yyyy = expDate.getFullYear(); 
+                expiryDateStr = `${dd}/${mm}/${yyyy}`; 
+            } 
+            if(isExp) return null; 
+            
+            return { 
+                model: type === SPECIAL_MODEL ? SPECIAL_MODEL : String(findValLocal(row,['MODEL','BRANDMODEL'])||"").toUpperCase(), 
+                brand: String(findValLocal(row, ['BRAND', 'MAKE'])||"").toUpperCase(), 
+                mrp: parseFloat(findValLocal(row, ['MRP', 'PRICE'])) || 0, 
+                tenure: parseInt(findValLocal(row, ['TOTALTENURE', 'TENURE', 'TA'])) || 0, 
+                advEmi: parseInt(findValLocal(row, ['ADVANCEEMI', 'ADV'])) || 0, 
+                dbd: parseFloat(findValLocal(row,['DBD','DBD%'])||0), 
+                pf: parseInt(findValLocal(row,['PF','PROCESSINGFEE'])||0), 
+                roi: parseFloat(findValLocal(row,['ROI','ROI%'])||0), 
+                fixedEmi: parseFloat(findValLocal(row,['FIXEDEMI', 'FIXED'])||0), 
+                category: standardizeCategoryName(findValLocal(row,['CATEGORY','CAT'])||""), 
+                minLoan: parseFloat(findValLocal(row, ['MINLOAN'])) || 0, 
+                maxLoan: parseFloat(findValLocal(row, ['MAXLOAN'])) || 9999999, 
+                isExpired: isExp, 
+                expiryDateStr: expiryDateStr, 
+                inactive: false 
+            }; 
+        }
+    </script>
+</body>
+</html>
